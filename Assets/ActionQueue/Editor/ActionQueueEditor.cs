@@ -76,9 +76,10 @@ namespace ActionQueue
             }
         }
 
-        private bool centerView;
-
-        private ActionBase fromNode;
+        private bool mCenterView;
+        private ActionBase mFromNode;
+        private ActionsInspector mActionsInspector;
+        private Rect mInspectorRect;
 
         #endregion
 
@@ -87,6 +88,7 @@ namespace ActionQueue
         {
             var window = EditorWindow.GetWindow<ActionQueueEditor>("ActionQueue");
             instance = window;
+            ActionQueueEditor.CanvasOffest = new Rect(0, 40, -300, -40);
         }
 
 
@@ -94,7 +96,10 @@ namespace ActionQueue
         {
             base.OnEnable();
             instance = this;
-            centerView = true;
+            mCenterView = true;
+            if (this.mActionsInspector == null)
+                this.mActionsInspector = new ActionsInspector();
+
         }
 
 
@@ -123,17 +128,23 @@ namespace ActionQueue
             {
                 this.DoNodes();
             }
-
-            AcceptDragAndDrop();
             End();
+
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField("Action Queue : ");
             Active = EditorGUILayout.ObjectField(Active, typeof(ActionExecutor), true) as ActionExecutor;
             EditorGUILayout.EndHorizontal();
-            if (centerView)
+
+            this.mInspectorRect = new Rect(this.scaledCanvasSize.width, this.scaledCanvasSize.y,
+                -ActionQueueEditor.CanvasOffest.width, this.scaledCanvasSize.height);
+            GUILayout.BeginArea(this.mInspectorRect);
+            this.mActionsInspector.OnInspectorGUI();
+            GUILayout.EndArea();
+
+            if (mCenterView)
             {
                 CenterView();
-                centerView = false;
+                mCenterView = false;
             }
         }
 
@@ -213,9 +224,11 @@ namespace ActionQueue
                 ActionBase node = selection[i];
                 DoNode(node);
             }
-
-            DoNodeEvents();
-            NodeContextMenu();
+            if (!this.isTouchInspaceArea())
+            {
+                DoNodeEvents();
+                NodeContextMenu();
+            }
         }
 
 
@@ -231,9 +244,9 @@ namespace ActionQueue
 
         private void DoTransitions()
         {
-            if (fromNode != null)
+            if (mFromNode != null)
             {
-                DrawConnection(fromNode.position.center, mousePosition, Color.green, 1, false);
+                DrawConnection(mFromNode.position.center, mousePosition, Color.green, 1, false);
                 Repaint();
             }
             for (int i = 0; i < Nodes.Count; i++)
@@ -268,8 +281,8 @@ namespace ActionQueue
             fromNode.AddNextID(toNode.ID);
             toNode.AddPrevID(fromNode.ID);
 
-//            ActionBaseInspector.SetDirty(fromNode);
-//            ActionBaseInspector.SetDirty(toNode);
+            //            ActionBaseInspector.SetDirty(mFromNode);
+            //            ActionBaseInspector.SetDirty(toNode);
         }
 
         #endregion
@@ -298,7 +311,7 @@ namespace ActionQueue
             nodeMenu.AddItem(ActionQueueContent.makeTransition, false, delegate ()
             {
                 if (node.ID != ActionBase.EndId)
-                    fromNode = node;
+                    mFromNode = node;
             });
 
 
@@ -316,24 +329,6 @@ namespace ActionQueue
 
 
 
-
-        private void AcceptDragAndDrop()
-        {
-            EventType eventType = Event.current.type;
-            bool isAccepted = false;
-            if ((eventType == EventType.DragUpdated || eventType == EventType.DragPerform))
-            {
-                DragAndDrop.visualMode = DragAndDropVisualMode.Link;
-
-                if (eventType == EventType.DragPerform)
-                {
-                    DragAndDrop.AcceptDrag();
-                    isAccepted = true;
-                }
-                Event.current.Use();
-            }
-
-        }
 
         private void DoNodeEvents()
         {
@@ -354,36 +349,40 @@ namespace ActionQueue
             switch (currentEvent.rawType)
             {
                 case EventType.MouseDown:
-                    GUIUtility.hotControl = controlID;
-                    ActionBase node = MouseOverNode();
-                    if (node != null)
+                    if (!this.isTouchInspaceArea())
                     {
-                        if (fromNode != null)
+                        GUIUtility.hotControl = controlID;
+                        ActionBase node = MouseOverNode();
+                        if (node != null)
                         {
-                            AddTransition(fromNode, node);
-                            fromNode = null;
+                            if (mFromNode != null)
+                            {
+                                AddTransition(mFromNode, node);
+                                mFromNode = null;
+                                GUIUtility.hotControl = 0;
+                                GUIUtility.keyboardControl = 0;
+                                return;
+                            }
+
+                            if (!this.selection.Contains(node))
+                            {
+                                this.selection.Clear();
+                                this.selection.Add(node);
+                            }
+
                             GUIUtility.hotControl = 0;
                             GUIUtility.keyboardControl = 0;
+                            UpdateUnitySelection();
                             return;
                         }
-
-                        if (!this.selection.Contains(node))
+                        mFromNode = null;
+                        if (!EditorGUI.actionKey)
                         {
                             this.selection.Clear();
-                            this.selection.Add(node);
+                            UpdateUnitySelection();
                         }
+                    }
 
-                        GUIUtility.hotControl = 0;
-                        GUIUtility.keyboardControl = 0;
-                        UpdateUnitySelection();
-                        return;
-                    }
-                    fromNode = null;
-                    if (!EditorGUI.actionKey && !currentEvent.shift)
-                    {
-                        this.selection.Clear();
-                        UpdateUnitySelection();
-                    }
                     currentEvent.Use();
                     break;
                 case EventType.MouseUp:
@@ -506,9 +505,9 @@ namespace ActionQueue
 
         private void UpdateUnitySelection()
         {
-//            Selection.objects = selection.ToArray();
-            if(selection.Count>0)
-                ActionExecutorInspector.SelectEditorAction = selection[0];
+            //            Selection.objects = selection.ToArray();
+            //            if(selection.Count>0)
+            //                ActionsInspector.SelectEditorAction = selection[0];
         }
 
         private ActionBase MouseOverNode()
@@ -524,6 +523,16 @@ namespace ActionQueue
             return null;
         }
 
+
+        private bool isTouchInspaceArea()
+        {
+            var pos = new Vector2();
+            pos.x = this.mousePosition.x - worldViewRect.x;
+            pos.y = this.mousePosition.y - worldViewRect.y + CanvasOffest.y * 2;
+            //            Debug.Log(pos);
+            //            Debug.Log(this.mInspectorRect);
+            return this.mInspectorRect.Contains(pos);
+        }
 
     }
 

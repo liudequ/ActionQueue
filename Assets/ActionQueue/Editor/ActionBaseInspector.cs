@@ -19,7 +19,7 @@ namespace ActionQueue
             int id = EditorGUILayout.IntField("ID",mNode.ID);
             if (id != mNode.ID)
             {
-                if(EditorUtility.DisplayDialog("修改行为ID","轻易不要修改ID,因为该初始会自动生成，且和程序代码关联。","我任性","我错了"))
+                if(EditorUtility.DisplayDialog("修改行为ID","轻易不要修改ID,因为该初始会自动生成，且和程序代码关联。","确定","取消"))
                     mNode.SetID(id);
             }
             GUILayout.Space(20);

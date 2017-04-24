@@ -19,7 +19,7 @@ namespace ActionQueue
     }
     //todo 添加父节点概念
     [System.Serializable]
-    public class ActionBase : MonoBehaviour
+    public class ActionBase 
     {
         public static int StartID = -1;
         public static int EndId = int.MaxValue;

@@ -8,6 +8,9 @@ namespace ActionQueue
         public const float MaxCanvasSize = 5000f;
         private const float GridMinorSize = 12f;
         private const float GridMajorSize = 120f;
+
+        public static Rect CanvasOffest = Rect.zero;
+
         public static Vector2 Center
         {
             get
@@ -25,12 +28,12 @@ namespace ActionQueue
         {
             get
             {
-                return new Rect(canvasSize.x * (1f / scale), canvasSize.y * (1f / scale), canvasSize.width * (1f / scale), canvasSize.height * (1f / scale));
+                return new Rect(canvasSize.x * (1f / scale) + CanvasOffest.x, canvasSize.y * (1f / scale) + CanvasOffest.y, canvasSize.width * (1f / scale) + CanvasOffest.width, canvasSize.height * (1f / scale) + CanvasOffest.height);
             }
         }
 
         [SerializeField]
-        private Rect worldViewRect;
+        protected Rect worldViewRect;
         [SerializeField]
         private Vector2 offset;
         protected Vector2 mousePosition;
@@ -64,13 +67,11 @@ namespace ActionQueue
             {
                 ActionQueueEditorStyles.canvasBackground.Draw(scaledCanvasSize, false, false, false, false);
                 DrawGrid();
-
             }
 
             Vector2 curScroll = GUI.BeginScrollView(scaledCanvasSize, scrollPosition, scrollView, GUIStyle.none, GUIStyle.none);
             UpdateScrollPosition(curScroll);
             mousePosition = Event.current.mousePosition;
-
 
         }
 
